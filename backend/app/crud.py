@@ -23,32 +23,30 @@ def create_room(db: Session, room_in: schemas.RoomCreate):
 
 def get_rooms_weekly(db: Session):
     now = datetime.now(TZ)
-    end = now + timedelta(days=7)
+    # Use start-of-today as lower bound so earlier-today finished bookings still appear
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_end = start_of_today + timedelta(days=7)
     rooms = db.scalars(select(models.Room).order_by(models.Room.id)).all()
-    # Eager load filtered bookings manually (simple approach)
     for r in rooms:
-        filtered = []
-        for b in r.bookings:
+        # ensure attribute exists even if empty
+        if not hasattr(r, 'bookings') or r.bookings is None:
+            r.bookings = []
+        kept: list[models.Booking] = []
+        for b in list(r.bookings):
             st = b.start_time
             et = b.end_time
-            if st is None or et is None:
+            if not st or not et:
                 continue
-            # Coerce naive datetimes to Asia/Taipei (legacy rows)
-            if st.tzinfo is None:
-                st = st.replace(tzinfo=TZ)
-            else:
-                st = st.astimezone(TZ)
-            if et.tzinfo is None:
-                et = et.replace(tzinfo=TZ)
-            else:
-                et = et.astimezone(TZ)
-            if st < end and et > now:
-                # write back normalized (optional)
+            # normalize to TZ
+            st = st.replace(tzinfo=TZ) if st.tzinfo is None else st.astimezone(TZ)
+            et = et.replace(tzinfo=TZ) if et.tzinfo is None else et.astimezone(TZ)
+            # condition: booking intersects [start_of_today, window_end)
+            if st < window_end and et > start_of_today:
                 b.start_time = st
                 b.end_time = et
-                filtered.append(b)
-    # Sort for stable display
-    r.bookings = sorted(filtered, key=lambda x: x.start_time)
+                kept.append(b)
+        kept.sort(key=lambda x: x.start_time)
+        r.bookings = kept
     return rooms
 
 def _validate_time_window(category: models.BookingCategory, start: datetime, end: datetime) -> bool:
@@ -61,12 +59,21 @@ def _validate_time_window(category: models.BookingCategory, start: datetime, end
         end_local = end.replace(tzinfo=TZ)
     else:
         end_local = end.astimezone(TZ)
-    local_start_hour = start_local.hour
-    local_end_hour = end_local.hour
+    # Use minute precision for comparison instead of only hours so a 30 分鐘或 1 小時內結束的時段不被誤判
+    start_minutes = start_local.hour * 60 + start_local.minute
+    end_minutes = end_local.hour * 60 + end_local.minute
+    if end_minutes <= start_minutes:
+        return False
+    # category windows (local) in minutes from midnight
     if category == models.BookingCategory.activity:
-        return 5 <= local_start_hour < 22 and 5 < local_end_hour <= 22 and local_end_hour > local_start_hour
-    if category == models.BookingCategory.meeting:
-        return 5 <= local_start_hour < 17 and 5 < local_end_hour <= 17 and local_end_hour > local_start_hour
+        window_start = 5 * 60  # 05:00 earliest
+        window_end = 22 * 60   # 22:00 latest end
+    elif category == models.BookingCategory.meeting:
+        window_start = 5 * 60
+        window_end = 17 * 60   # 17:00 latest end
+    else:
+        return False
+    return window_start <= start_minutes < window_end and window_start < end_minutes <= window_end
     return False
 
 def _is_half_hour(dt: datetime) -> bool:

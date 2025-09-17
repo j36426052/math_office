@@ -70,8 +70,29 @@ export async function adminDeleteBooking(id) {
 }
 
 export async function fetchWeeklyRooms() {
-  const r = await fetch(`${API_BASE}/rooms/weekly`);
-  return r.json();
+  const url = `${API_BASE}/rooms/weekly`;
+  console.log('[weekly] fetch start', { url });
+  let r;
+  try {
+    r = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
+  } catch (e) {
+    console.error('[weekly] network error', e);
+    throw e;
+  }
+  console.log('[weekly] status', r.status);
+  let data = null;
+  try {
+    data = await r.json();
+  } catch (e) {
+    console.error('[weekly] json parse error', e);
+    throw e;
+  }
+  if(!r.ok) {
+    console.error('[weekly] non-ok response', data);
+    throw new Error(data && data.detail ? data.detail : 'weekly fetch failed');
+  }
+  console.log('[weekly] data length', Array.isArray(data) ? data.length : 'not-array', data);
+  return data;
 }
 
 export async function createSemesterBookings(data) {

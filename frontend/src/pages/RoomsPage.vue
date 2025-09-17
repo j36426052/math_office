@@ -31,9 +31,21 @@ function bookingSpans(bks) {
 
 onMounted(async () => {
   try {
-    rooms.value = await fetchWeeklyRooms()
+    const data = await fetchWeeklyRooms()
+    console.log('[RoomsPage] fetched weekly rooms raw:', data)
+    if (!Array.isArray(data)) {
+      console.error('[RoomsPage] data is not array', data)
+      error.value = '資料格式錯誤'
+      return
+    }
+    rooms.value = data
+    console.log('[RoomsPage] rooms count', rooms.value.length, rooms.value.map(r=>r.name))
+    if (rooms.value.length === 0) {
+      console.warn('[RoomsPage] rooms array empty')
+    }
   } catch (e) {
     error.value = e.message || '讀取失敗'
+    console.error('[RoomsPage] fetch error', e)
   } finally { loading.value = false }
 })
 </script>
