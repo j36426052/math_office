@@ -1,0 +1,5 @@
+/* Base minimal styles; theming handled in theme.css */
+*, *::before, *::after { box-sizing:border-box; }
+body { margin:0; }
+img { max-width:100%; display:block; }
+a { text-decoration:none; }

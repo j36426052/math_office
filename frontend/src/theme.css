@@ -1,0 +1,155 @@
+/* Theme variables */
+:root {
+  /* Base colors */
+  --bg: #f8fafc;
+  --bg-alt: #eef2f6;
+  --surface: #ffffff;
+  --surface-alt: #f1f5f9;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #dbe2ea;
+  --border-strong: #c3ccd5;
+  --focus-ring: #3b82f6;
+
+  /* Brand */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-fg: #ffffff;
+
+  /* Semantic */
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --warning: #f59e0b;
+  --warning-bg: #fef3c7;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --info: #0ea5e9;
+  --info-bg: #e0f2fe;
+
+  /* Booking / status chips */
+  --chip-default-bg: #e2e8f0;
+  --chip-pending-bg: var(--warning-bg);
+  --chip-approved-bg: #bbf7d0;
+  --chip-rejected-bg: #fecaca;
+  --chip-text: var(--text);
+
+  /* Timetable */
+  --timetable-grid-border: #e2e8f0;
+  --timetable-slot-border: #e2e8f0;
+  --timetable-header-bg: var(--surface-alt);
+  --booking-bg: #3b82f6;
+  --booking-approved-bg: var(--success);
+  --booking-pending-bg: var(--warning);
+  --booking-rejected-bg: var(--danger);
+
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 10px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.08);
+  --shadow-md: 0 2px 4px rgba(0,0,0,.12);
+  --transition: 0.18s cubic-bezier(.4,0,.2,1);
+
+  --font-stack: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+
+.dark {
+  --bg: #0f172a;
+  --bg-alt: #162132;
+  --surface: #1e293b;
+  --surface-alt: #243249;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --border-strong: #3f4d62;
+  --focus-ring: #93c5fd;
+  --primary: #3b82f6;
+  --primary-hover: #1d4ed8;
+  --primary-fg: #ffffff;
+  --success-bg: #064e3b;
+  --warning-bg: #7c5206;
+  --danger-bg: #7f1d1d;
+  --info-bg: #0c4a6e;
+  --chip-default-bg: #334155;
+  --chip-pending-bg: #b45309;
+  --chip-approved-bg: #065f46;
+  --chip-rejected-bg: #7f1d1d;
+  --timetable-grid-border: #334155;
+  --timetable-slot-border: #334155;
+  --timetable-header-bg: #243249;
+  --booking-bg: #2563eb;
+  --booking-approved-bg: #15803d;
+  --booking-pending-bg: #d97706;
+  --booking-rejected-bg: #b91c1c;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.6);
+  --shadow-md: 0 2px 4px rgba(0,0,0,.55);
+}
+
+html, body {
+  padding:0; margin:0; font-family:var(--font-stack); background:var(--bg); color:var(--text);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+
+body { min-height:100vh; }
+
+#app { max-width:1280px; margin:0 auto; }
+
+/* Utilities */
+.flex { display:flex; }
+.flex-center { display:flex; align-items:center; }
+.gap-s { gap:0.5rem; }
+.gap-m { gap:0.75rem; }
+.space-between { justify-content:space-between; }
+.muted { color:var(--text-muted); }
+.text-sm { font-size:12px; }
+.shadow-sm { box-shadow:var(--shadow-sm); }
+.rounded { border-radius:var(--radius-m); }
+
+/* Header */
+.app-header { background:var(--surface); border-bottom:1px solid var(--border); padding:0.75rem 1rem; display:flex; align-items:center; gap:1rem; position:sticky; top:0; z-index:10; }
+.app-title { font-size:1.05rem; font-weight:600; margin:0; }
+.app-nav a { color:var(--primary); text-decoration:none; font-weight:500; position:relative; padding:2px 4px; border-radius:4px; }
+.app-nav a.router-link-active { background:var(--primary); color:var(--primary-fg); }
+.app-nav a:hover { background:var(--primary-hover); color:var(--primary-fg); }
+
+/* Buttons */
+.btn { cursor:pointer; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); padding:0.45rem 0.9rem; font-size:0.85rem; border-radius:var(--radius-s); line-height:1.1; display:inline-flex; align-items:center; gap:0.4rem; transition:var(--transition); }
+.btn:hover { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); }
+.btn-primary { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); }
+.btn-primary:hover { background:var(--primary-hover); }
+.btn-danger { background:var(--danger); color:#fff; border-color:var(--danger); }
+.btn-danger:hover { filter:brightness(1.1); }
+
+/* Tables */
+.tbl { border-collapse:collapse; width:100%; font-size:12px; background:var(--surface); }
+.tbl th, .tbl td { border:1px solid var(--border); padding:4px 6px; }
+.tbl th { background:var(--surface-alt); text-align:left; font-weight:600; }
+
+/* Chips */
+.booking-chip { background:var(--chip-default-bg); color:var(--chip-text); }
+.booking-chip.pending { background:var(--chip-pending-bg); }
+.booking-chip.approved { background:var(--chip-approved-bg); }
+.booking-chip.rejected { background:var(--chip-rejected-bg); text-decoration:line-through; }
+
+/* Timetable */
+.timetable-wrapper { border:1px solid var(--border); border-radius:var(--radius-m); padding:0.75rem; background:var(--surface); }
+.time-cell { color:var(--text-muted); }
+.slot-row { border-bottom:1px dashed var(--timetable-slot-border); }
+.weekly-day { border-left:1px solid var(--timetable-grid-border); }
+.weekly-day-header { background:var(--timetable-header-bg); }
+.tt-booking { background:var(--booking-bg); }
+.tt-booking.pending { background:var(--booking-pending-bg); }
+.tt-booking.approved { background:var(--booking-approved-bg); }
+.tt-booking.rejected { background:var(--booking-rejected-bg); text-decoration:line-through; }
+
+/* Forms */
+input, select, textarea { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 6px; font:inherit; }
+input:focus, select:focus, textarea:focus { outline:2px solid var(--focus-ring); outline-offset:1px; }
+
+/* Scrollbars (webkit) */
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-track { background:var(--bg-alt); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:6px; }
+::-webkit-scrollbar-thumb:hover { background:var(--border-strong); }
+
+/* Transition theme */
+body, body * { transition: background-color .35s ease, color .35s ease, border-color .35s ease; }
