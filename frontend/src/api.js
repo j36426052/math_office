@@ -6,6 +6,26 @@ const API_BASE = (import.meta.env.VITE_API_BASE && import.meta.env.VITE_API_BASE
   ? import.meta.env.VITE_API_BASE.trim().replace(/\/$/, '')
   : (window.location.port === '5173' ? 'http://localhost:8000' : '');
 
+let adminAuthHeader = null;
+export function setAdminAuth(user, pass) {
+  if(!user || !pass) { adminAuthHeader = null; return; }
+  adminAuthHeader = 'Basic ' + btoa(`${user}:${pass}`);
+}
+function authHeaders(extra={}) {
+  return adminAuthHeader ? { ...extra, 'Authorization': adminAuthHeader } : extra;
+}
+
+export async function pingAdmin() {
+  const r = await fetch(`${API_BASE}/admin/ping`, { headers: authHeaders() });
+  if(!r.ok) throw new Error('unauthorized');
+  return r.json();
+}
+
+export async function verifyAdmin() {
+  const data = await pingAdmin();
+  return data && data.ok;
+}
+
 export async function fetchRooms() {
   const r = await fetch(`${API_BASE}/rooms`);
   return r.json();
@@ -36,7 +56,7 @@ export async function createBooking(data) {
 export async function adminUpdateBooking(id, status) {
   const r = await fetch(`${API_BASE}/admin/bookings/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ status })
   });
   if(!r.ok) throw new Error((await r.json()).detail || 'Error');
@@ -44,7 +64,7 @@ export async function adminUpdateBooking(id, status) {
 }
 
 export async function adminDeleteBooking(id) {
-  const r = await fetch(`${API_BASE}/admin/bookings/${id}`, { method: 'DELETE' });
+  const r = await fetch(`${API_BASE}/admin/bookings/${id}`, { method: 'DELETE', headers: authHeaders() });
   if(!r.ok) throw new Error((await r.json()).detail || 'Error');
   return r.json();
 }
@@ -57,7 +77,7 @@ export async function fetchWeeklyRooms() {
 export async function createSemesterBookings(data) {
   const r = await fetch(`${API_BASE}/admin/semester_bookings`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
   if(!r.ok) throw new Error((await r.json()).detail || 'Error');

@@ -1,0 +1,16 @@
+# Backend Dockerfile
+FROM python:3.12-slim AS base
+ARG TZ=Asia/Taipei
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY backend/requirements.txt /app/backend/requirements.txt
+# Fallback: if the file is empty or minimal, ensure core deps
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& if [ -s /app/backend/requirements.txt ]; then pip install -r /app/backend/requirements.txt; else pip install fastapi uvicorn sqlalchemy pydantic tzdata; fi
+COPY backend /app/backend
+WORKDIR /app/backend
+# Environment variables (override at runtime)
+ENV TZ=${TZ}
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

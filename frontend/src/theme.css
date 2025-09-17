@@ -42,14 +42,34 @@
   --booking-pending-bg: var(--warning);
   --booking-rejected-bg: var(--danger);
 
-  --radius-s: 4px;
-  --radius-m: 6px;
-  --radius-l: 10px;
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.08);
   --shadow-md: 0 2px 4px rgba(0,0,0,.12);
+  --border-width: 2px;
+  --border-width-strong: 3px;
   --transition: 0.18s cubic-bezier(.4,0,.2,1);
 
-  --font-stack: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  /* Spacing scale */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 32px;
+
+  /* Typography */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --line-height-base: 1.4;
+
+  --font-stack: "Inter var", "Inter", system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --heading-stack: "Poppins", var(--font-stack);
+  --mono-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 .dark {
@@ -85,7 +105,7 @@
 }
 
 html, body {
-  padding:0; margin:0; font-family:var(--font-stack); background:var(--bg); color:var(--text);
+  padding:0; margin:0; font-family:var(--font-stack); background:linear-gradient(160deg, var(--bg) 0%, var(--bg-alt) 55%, var(--surface-alt) 100%); color:var(--text);
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
 
@@ -105,14 +125,19 @@ body { min-height:100vh; }
 .rounded { border-radius:var(--radius-m); }
 
 /* Header */
-.app-header { background:var(--surface); border-bottom:1px solid var(--border); padding:0.75rem 1rem; display:flex; align-items:center; gap:1rem; position:sticky; top:0; z-index:10; }
-.app-title { font-size:1.05rem; font-weight:600; margin:0; }
-.app-nav a { color:var(--primary); text-decoration:none; font-weight:500; position:relative; padding:2px 4px; border-radius:4px; }
-.app-nav a.router-link-active { background:var(--primary); color:var(--primary-fg); }
-.app-nav a:hover { background:var(--primary-hover); color:var(--primary-fg); }
+.app-header { background:linear-gradient(135deg, var(--surface) 0%, var(--surface-alt) 100%); border:var(--border-width) solid var(--border); padding:0.75rem 1rem; display:flex; align-items:center; gap:1rem; position:sticky; top:0; z-index:10; margin:8px 8px 12px; border-radius:18px; box-shadow:var(--shadow-sm); backdrop-filter:blur(6px); }
+.app-title { font-size:1.1rem; font-weight:600; margin:0; font-family:var(--heading-stack); letter-spacing:.5px; }
+.app-nav { flex-wrap:wrap; }
+.nav-shell { overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+.nav-shell::-webkit-scrollbar { display:none; }
+.app-nav a { color:var(--text); text-decoration:none; font-weight:500; position:relative; padding:6px 10px; border-radius:10px; line-height:1; font-size:0.8rem; background:transparent; display:inline-flex; align-items:center; gap:4px; border:1px solid transparent; }
+.app-nav a::after { content:""; position:absolute; left:10px; right:10px; bottom:3px; height:2px; border-radius:2px; background:transparent; transition:var(--transition); }
+.app-nav a.router-link-active { color:var(--primary); font-weight:600; }
+.app-nav a.router-link-active::after { background:var(--primary); }
+.app-nav a:hover { color:var(--primary); }
 
 /* Buttons */
-.btn { cursor:pointer; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); padding:0.45rem 0.9rem; font-size:0.85rem; border-radius:var(--radius-s); line-height:1.1; display:inline-flex; align-items:center; gap:0.4rem; transition:var(--transition); }
+.btn { cursor:pointer; border:var(--border-width) solid var(--border); background:var(--surface-alt); color:var(--text); padding:0.5rem 1rem; font-size:0.85rem; border-radius:var(--radius-m); line-height:1.1; display:inline-flex; align-items:center; gap:0.4rem; transition:var(--transition); font-weight:500; }
 .btn:hover { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); }
 .btn-primary { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); }
 .btn-primary:hover { background:var(--primary-hover); }
@@ -120,9 +145,20 @@ body { min-height:100vh; }
 .btn-danger:hover { filter:brightness(1.1); }
 
 /* Tables */
-.tbl { border-collapse:collapse; width:100%; font-size:12px; background:var(--surface); }
-.tbl th, .tbl td { border:1px solid var(--border); padding:4px 6px; }
+.tbl { border-collapse:separate; border-spacing:0; width:100%; font-size:12px; background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-l); overflow:hidden; }
+.tbl th, .tbl td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px 8px; }
+.tbl th:last-child, .tbl td:last-child { border-right:none; }
+.tbl tbody tr:last-child td { border-bottom:none; }
 .tbl th { background:var(--surface-alt); text-align:left; font-weight:600; }
+.tbl th, .tbl td { border:1px solid var(--border); padding:4px 6px; vertical-align:top; }
+.tbl th { background:var(--surface-alt); text-align:left; font-weight:600; position:sticky; top:0; z-index:1; }
+.tbl tbody tr:nth-child(even) { background:var(--surface-alt); }
+.tbl tbody tr:hover { background:var(--info-bg); }
+
+/* Weekly rooms today highlight */
+.rooms-week .day-head { position:relative; }
+.rooms-week .day-head.today-col { background:var(--primary); color:var(--primary-fg); }
+.rooms-week .day-head.today-col::after { content:"Today"; position:absolute; inset:auto 4px 2px auto; font-size:9px; background:var(--primary-hover); padding:1px 4px; border-radius:6px; }
 
 /* Chips */
 .booking-chip { background:var(--chip-default-bg); color:var(--chip-text); }
@@ -142,7 +178,7 @@ body { min-height:100vh; }
 .tt-booking.rejected { background:var(--booking-rejected-bg); text-decoration:line-through; }
 
 /* Forms */
-input, select, textarea { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 6px; font:inherit; }
+input, select, textarea { background:var(--surface); color:var(--text); border:var(--border-width) solid var(--border); border-radius:var(--radius-m); padding:6px 8px; font:inherit; }
 input:focus, select:focus, textarea:focus { outline:2px solid var(--focus-ring); outline-offset:1px; }
 
 /* Scrollbars (webkit) */

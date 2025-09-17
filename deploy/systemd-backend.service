@@ -1,0 +1,17 @@
+[Unit]
+Description=Classroom Booking Backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/math_office/backend
+Environment=PYTHONUNBUFFERED=1
+Environment=BACKEND_CORS_ORIGINS=http://140.119.66.208
+ExecStart=/usr/bin/env uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

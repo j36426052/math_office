@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -8,20 +10,59 @@ from datetime import datetime
 
 app = FastAPI(title="教室借用系統 API", docs_url=None, redoc_url=None)
 
-# CORS origins configurable via env BACKEND_CORS_ORIGINS (comma separated)
+# -------------------- ADMIN BASIC AUTH --------------------
+security = HTTPBasic()
+ADMIN_USER = os.getenv("ADMIN_USER")
+ADMIN_PASS = os.getenv("ADMIN_PASS")
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    # If credentials not configured -> open (for dev)
+    if not ADMIN_USER or not ADMIN_PASS:
+        return True
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    user_ok = secrets.compare_digest(credentials.username, ADMIN_USER)
+    pass_ok = secrets.compare_digest(credentials.password, ADMIN_PASS)
+    if not (user_ok and pass_ok):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+# -------------------- CORS CONFIG --------------------
+# Environment variables:
+# BACKEND_CORS_ALLOW_ALL=true              -> allow all (credentials disabled)
+# BACKEND_CORS_ORIGINS=http://a,http://b   -> explicit list
+# BACKEND_CORS_ORIGINS_REGEX=^https://.*$  -> regex mode (mutually exclusive with list)
+# PUBLIC_HOST=booking.example.edu          -> auto append http/https variants if not present
+allow_all_env = os.getenv("BACKEND_CORS_ALLOW_ALL", "false").lower() == "true"
 raw_origins = os.getenv("BACKEND_CORS_ORIGINS")
-if raw_origins:
-    origins = [o.strip() for o in raw_origins.split(',') if o.strip()]
+raw_regex = os.getenv("BACKEND_CORS_ORIGINS_REGEX")
+public_host = os.getenv("PUBLIC_HOST")
+
+origins: list[str] = []
+allow_origin_regex = None
+if allow_all_env:
+    origins = ["*"]
+elif raw_origins:
+    origins = [o.strip() for o in raw_origins.split(',') if o.strip() and o.strip() != "*"]
+elif raw_regex:
+    allow_origin_regex = raw_regex
 else:
-    # sensible dev defaults; can be overridden in deployment
     origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+if public_host and not allow_origin_regex and "*" not in origins:
+    for proto in ("http", "https"):
+        candidate = f"{proto}://{public_host}"
+        if candidate not in origins:
+            origins.append(candidate)
+
+cors_common = dict(allow_methods=["*"], allow_headers=["*"], expose_headers=["*"], max_age=86400)
+if origins == ["*"]:
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, **cors_common)
+elif allow_origin_regex:
+    app.add_middleware(CORSMiddleware, allow_origin_regex=allow_origin_regex, allow_credentials=True, **cors_common)
+else:
+    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, **cors_common)
+# -----------------------------------------------------
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -30,18 +71,38 @@ Base.metadata.create_all(bind=engine)
 @app.on_event("startup")
 async def seed_rooms():
     with next(get_db()) as db:
+        # Initial seed if empty
         if not db.query(models.Room).first():
             initial_rooms = [
-                ("116", None),
-                ("221", None),
-                ("電腦教室", "電腦設備齊全"),
-                ("204", None),
+                ("志希 116", None),
+                ("志希 221（E 化教室）", None),
+                ("志希樓電腦教室", None),
+                ("大智 204", None),
                 ("研討一", None),
                 ("研討二", None),
             ]
             for name, desc in initial_rooms:
                 db.add(models.Room(name=name, description=desc))
             db.commit()
+        else:
+            # Migration: rename legacy names and remove old description
+            changed = False
+            mapping = {
+                "116": "志希 116",
+                "221": "志希 221（E 化教室）",
+                "電腦教室": "志希樓電腦教室",
+                "204": "大智 204",
+            }
+            q = db.query(models.Room).all()
+            for r in q:
+                if r.name in mapping and r.name != mapping[r.name]:
+                    r.name = mapping[r.name]
+                    changed = True
+                if r.name == "志希樓電腦教室" and r.description:
+                    r.description = None
+                    changed = True
+            if changed:
+                db.commit()
 
 @app.get("/rooms/weekly", response_model=list[schemas.WeeklyRoom])
 def list_rooms_weekly(db: Session = Depends(get_db)):
@@ -74,22 +135,30 @@ def create_booking(booking_in: schemas.BookingCreate, db: Session = Depends(get_
 def list_all_bookings(room_id: int | None = None, status: schemas.BookingStatus | None = None, db: Session = Depends(get_db)):
     return crud.list_bookings(db, room_id=room_id, status=status)
 
-# Admin (simple placeholder, no auth yet)
-@app.patch("/admin/bookings/{booking_id}", response_model=schemas.Booking)
+@app.patch("/admin/bookings/{booking_id}", response_model=schemas.Booking, dependencies=[Depends(require_admin)])
 def update_status(booking_id: int, update: schemas.BookingUpdateStatus, db: Session = Depends(get_db)):
     booking = crud.update_booking_status(db, booking_id, update.status)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     return booking
 
-@app.delete("/admin/bookings/{booking_id}")
+@app.delete("/admin/bookings/{booking_id}", dependencies=[Depends(require_admin)])
 def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     ok = crud.delete_booking(db, booking_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Booking not found")
     return {"success": True}
 
-@app.post("/admin/semester_bookings", response_model=schemas.SemesterBookingResult)
+@app.post("/admin/semester_bookings", response_model=schemas.SemesterBookingResult, dependencies=[Depends(require_admin)])
 def create_semester(sem_req: schemas.SemesterBookingCreate, db: Session = Depends(get_db)):
     created_ids, skipped = crud.create_semester_bookings(db, sem_req)
     return schemas.SemesterBookingResult(created_ids=created_ids, skipped_conflicts=skipped)
+
+@app.get("/admin/ping", dependencies=[Depends(require_admin)])
+def admin_ping():
+    # auth_enabled True when ADMIN_USER & ADMIN_PASS both set
+    return {"ok": True, "auth_enabled": bool(ADMIN_USER and ADMIN_PASS)}
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok", "time": datetime.utcnow().isoformat()}

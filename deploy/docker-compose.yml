@@ -1,0 +1,42 @@
+services:
+  backend:
+    image: math_office-backend:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+      args:
+        - TZ=Asia/Taipei
+    platform: linux/amd64
+    env_file:
+      - ../.env
+    environment:
+      - TZ=Asia/Taipei
+      - DATABASE_URL=sqlite:////data/app.db
+      # Example: enable wildcard (not required when proxying same-origin)
+      # - BACKEND_CORS_ALLOW_ALL=true
+    restart: unless-stopped
+    volumes:
+      - booking_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    image: math_office-frontend:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    platform: linux/amd64
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+# Run: docker compose -f deploy/docker-compose.yml up -d --build
+# Then open http://<host>/  (frontend calls /api/* same-origin, backend not exposed)
+
+volumes:
+  booking_data:
