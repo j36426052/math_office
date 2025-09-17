@@ -48,7 +48,7 @@ pip install -r backend/requirements.txt
 ```
 uvicorn backend.app.main:app --reload --port 8000
 ```
-API 文件： http://127.0.0.1:8000/docs
+API 文件（開發預設）: http://localhost:8000/docs  （部署時可關閉 docs 並設定自訂網域）
 
 ## 從 0 開始快速安裝與執行 (Zero-to-Run)
 以下指令假設你只有系統預設的 git / Node / Python (>=3.11)。若缺少請先安裝。
@@ -75,8 +75,10 @@ uvicorn backend.app.main:app --reload --port 8000 &
 cd frontend
 npm install
 
-# 6. (可選) 設定 API 位置，未設置則預設 http://127.0.0.1:8000
-echo "VITE_API_BASE=http://127.0.0.1:8000" > .env
+# 6. (可選) 設定 API 位置
+# 默認：開發 (Vite 5173) 前端會自動使用 http://localhost:8000
+# 若前後端同網域 & 反向代理，可不設定 VITE_API_BASE 讓前端採用相對路徑
+echo "VITE_API_BASE=https://your-api.example.com" > .env
 
 # 7. 啟動前端開發伺服器
 npm run dev
@@ -88,7 +90,7 @@ pytest -q
 
 打開瀏覽器：
 - 使用者前端：http://localhost:5173
-- 後端 Swagger 文件：http://127.0.0.1:8000/docs
+- 後端 Swagger 文件：開發階段 http://localhost:8000/docs （若未關閉）
 
 ### Windows (PowerShell)
 ```powershell
@@ -103,7 +105,7 @@ uvicorn backend.app.main:app --reload --port 8000
 
 cd frontend
 npm install
-"VITE_API_BASE=http://127.0.0.1:8000" | Out-File -Encoding utf8 .env
+"VITE_API_BASE=https://your-api.example.com" | Out-File -Encoding utf8 .env
 npm run dev
 
 # 新開一個 PowerShell 視窗可執行：
@@ -130,7 +132,12 @@ npm run dev
 
 `.env` 可設定：
 ```
-VITE_API_BASE=http://127.0.0.1:8000
+# 可選：指定後端 API 完整 URL（留空採相對路徑或預設 localhost:8000 開發）
+VITE_API_BASE=https://your-api.example.com
+
+# 後端 CORS 允許來源（逗號分隔），例：
+# BACKEND_CORS_ORIGINS=http://localhost:5173,https://booking.example.edu
+BACKEND_CORS_ORIGINS=
 ```
 
 ## API 簡述

@@ -1,4 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+// API base resolution order:
+// 1. Explicit VITE_API_BASE (e.g. https://api.example.com)
+// 2. Same origin (relative) if front-end served by backend ('' prefix)
+// 3. Fallback dev default http://localhost:8000
+const API_BASE = (import.meta.env.VITE_API_BASE && import.meta.env.VITE_API_BASE.trim())
+  ? import.meta.env.VITE_API_BASE.trim().replace(/\/$/, '')
+  : (window.location.port === '5173' ? 'http://localhost:8000' : '');
 
 export async function fetchRooms() {
   const r = await fetch(`${API_BASE}/rooms`);

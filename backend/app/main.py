@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import models, schemas, crud
@@ -7,7 +8,13 @@ from datetime import datetime
 
 app = FastAPI(title="教室借用系統 API", docs_url=None, redoc_url=None)
 
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# CORS origins configurable via env BACKEND_CORS_ORIGINS (comma separated)
+raw_origins = os.getenv("BACKEND_CORS_ORIGINS")
+if raw_origins:
+    origins = [o.strip() for o in raw_origins.split(',') if o.strip()]
+else:
+    # sensible dev defaults; can be overridden in deployment
+    origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
