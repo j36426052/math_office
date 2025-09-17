@@ -11,6 +11,7 @@ class BookingStatus(str, Enum):
 class BookingCategory(str, Enum):
     activity = "activity"
     meeting = "meeting"
+    course = "course"  # 課程
 
 class RoomBase(BaseModel):
     name: str

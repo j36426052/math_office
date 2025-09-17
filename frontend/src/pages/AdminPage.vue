@@ -21,9 +21,9 @@ const filter = ref('all')
 
 const semForm = ref({
   room_id: null, // internal id
-  category: 'activity',
+  category: 'meeting', // meeting as default
   user_name: '',
-  user_identity: '',
+  user_identity: '', // 指導老師
   purpose: '',
   start_date: '',
   end_date: '',
@@ -250,21 +250,10 @@ function logoutAdmin() {
 
 <template>
   <div>
-  <div v-if="needLogin && authState.authEnabled" class="login-only">
-    <BaseCard class="login-panel">
-      <h2 style="margin:0 0 1rem;">管理登入</h2>
-      <div class="login-fields">
-        <BaseInput label="帳號" v-model="adminUser" />
-        <BaseInput label="密碼" type="password" v-model="adminPass" />
-        <BaseButton variant="primary" @click="attemptLogin">登入</BaseButton>
-      </div>
-      <p v-if="authError" class="err">{{ authError }}</p>
-    </BaseCard>
-  </div>
-  <div v-else>
+  <div>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
       <h2 style="margin:0;">後台管理</h2>
-      <BaseButton v-if="authState.authEnabled" size="sm" @click="logoutAdmin">登出</BaseButton>
+  <BaseButton v-if="authState.authEnabled" size="sm" @click="logoutAdmin">登出</BaseButton>
     </div>
   <details style="margin:1rem 0;" open class="sem-wrapper">
       <summary class="sem-summary">整學期借用建立</summary>
@@ -273,8 +262,9 @@ function logoutAdmin() {
           <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.name }}</option>
         </BaseSelect>
         <BaseSelect label="類別" v-model="semForm.category">
-          <option value="activity">活動</option>
           <option value="meeting">會議</option>
+          <option value="course">課程</option>
+          <option value="activity">活動</option>
         </BaseSelect>
         <div>
           <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">週期日 (自動)</label>
@@ -291,7 +281,7 @@ function logoutAdmin() {
           <option v-for="s in endSlots()" :key="s" :value="s">{{ s }}</option>
         </BaseSelect>
         <BaseInput label="申請人" v-model="semForm.user_name" required />
-        <BaseInput label="身份" v-model="semForm.user_identity" required />
+  <BaseInput label="指導老師" v-model="semForm.user_identity" required />
         <label style="grid-column:1/-1; font-size:12px; font-weight:600;">用途<textarea v-model="semForm.purpose" rows="2" style="margin-top:4px; width:100%;" /></label>
         <div style="grid-column:1/-1; display:flex; gap:.5rem;">
           <BaseButton variant="primary" type="submit">建立</BaseButton>
@@ -341,13 +331,13 @@ function logoutAdmin() {
     <p v-if="loading">載入中...</p>
     <p v-if="error" style="color:red">{{ error }}</p>
     <BaseTable v-if="!loading && filteredSortedBookings.length" :columns="[
-      {label:'ID'}, {label:'教室'}, {label:'申請人'}, {label:'身份'}, {label:'類別'}, {label:'用途'}, {label:'申請時間'}, {label:'開始'}, {label:'結束'}, {label:'狀態'}, {label:'操作'}
+  {label:'ID'}, {label:'教室'}, {label:'申請人'}, {label:'指導老師'}, {label:'類別'}, {label:'用途'}, {label:'申請時間'}, {label:'開始'}, {label:'結束'}, {label:'狀態'}, {label:'操作'}
     ]">
-      <tr v-for="b in filteredSortedBookings" :key="b.id">
+  <tr v-for="b in filteredSortedBookings" :key="b.id">
         <td>{{ b.id }}</td>
         <td>{{ roomMap[b.room_id] || b.room_id }}</td>
         <td>{{ b.user_name }}</td>
-        <td>{{ b.user_identity }}</td>
+  <td>{{ b.user_identity }}</td>
         <td>{{ b.category }}</td>
         <td>{{ b.purpose }}</td>
         <td>{{ new Date(b.requested_at || b.created_at).toLocaleString() }}</td>

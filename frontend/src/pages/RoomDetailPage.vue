@@ -196,7 +196,7 @@ async function submit() {
       <p>{{ room.description || '—' }}</p>
   <h4>已申請時段（原始列表）</h4>
   <table v-if="room.bookings && room.bookings.length" class="tbl raw-list" style="font-size:12px;">
-        <thead><tr><th>申請人</th><th>身份</th><th>類別</th><th>目的</th><th>開始</th><th>結束</th><th>狀態</th></tr></thead>
+  <thead><tr><th>申請人</th><th>指導老師</th><th>類別</th><th>目的</th><th>開始</th><th>結束</th><th>狀態</th></tr></thead>
         <tbody>
           <tr v-for="b in room.bookings" :key="b.id">
             <td>{{ b.user_name }}</td>
@@ -262,10 +262,11 @@ async function submit() {
         <div class="card-head"><span class="icon">📝</span><span class="title">借用申請表單</span></div>
         <form @submit.prevent="submit" class="form-grid enhanced">
           <BaseInput label="姓名" v-model="form.user_name" required />
-          <BaseInput label="身份" v-model="form.user_identity" required placeholder="學號/教師等" />
+          <BaseInput label="指導老師" v-model="form.user_identity" required placeholder="指導老師姓名或單位" />
           <BaseSelect label="類別" v-model="form.category">
-            <option value="activity">活動</option>
             <option value="meeting">會議</option>
+            <option value="course">課程</option>
+            <option value="activity">活動</option>
           </BaseSelect>
           <BaseInput type="date" label="日期" v-model="form.date" :min="todayStr" :max="maxDateStr" required />
           <BaseSelect label="開始" v-model="form.start_hm" required>

@@ -66,7 +66,7 @@ def _validate_time_window(category: models.BookingCategory, start: datetime, end
     if end_minutes <= start_minutes:
         return False
     # category windows (local) in minutes from midnight
-    if category == models.BookingCategory.activity:
+    if category in (models.BookingCategory.activity, getattr(models.BookingCategory, 'course', None)):
         window_start = 5 * 60  # 05:00 earliest
         window_end = 22 * 60   # 22:00 latest end
     elif category == models.BookingCategory.meeting:
