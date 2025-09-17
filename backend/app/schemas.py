@@ -64,7 +64,6 @@ class SemesterBookingCreate(BaseModel):
     user_name: str
     user_identity: str
     purpose: Optional[str] = None
-    weekday: int = Field(..., ge=0, le=6, description="0=Monday")
     start_time_hm: str = Field(..., pattern=r"^\d{2}:\d{2}$")
     end_time_hm: str = Field(..., pattern=r"^\d{2}:\d{2}$")
     start_date: date

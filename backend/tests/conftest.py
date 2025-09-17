@@ -1,6 +1,11 @@
-import sys, pathlib
+import sys
+from pathlib import Path
 
-# Ensure project root (one level up from 'backend') is on path so 'backend.app' imports work
-root = pathlib.Path(__file__).resolve().parents[2]
-if str(root) not in sys.path:
-    sys.path.insert(0, str(root))
+tests_dir = Path(__file__).resolve().parent
+backend_dir = tests_dir.parent  # backend/
+project_root = backend_dir.parent  # project root containing backend/
+
+for p in (backend_dir, project_root):
+    p_str = str(p)
+    if p_str not in sys.path:
+        sys.path.insert(0, p_str)

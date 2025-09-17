@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from . import models, schemas
 
 TZ = ZoneInfo("Asia/Taipei")
+MAX_SEMESTER_WEEKS = 40  # safety guard to prevent runaway loops
 
 # Rooms
 
@@ -154,14 +155,20 @@ def delete_booking(db: Session, booking_id: int):
 def create_semester_bookings(db: Session, payload: schemas.SemesterBookingCreate):
     created_ids = []
     skipped = []
-    # Build first occurrence date that matches weekday >= start_date
+    if payload.end_date < payload.start_date:
+        return created_ids, skipped
+    # derive weekday from start_date
+    target_weekday = payload.start_date.weekday()
     current = payload.start_date
-    # advance to weekday
-    while current.weekday() != payload.weekday:
-        current += timedelta(days=1)
-    # iterate weekly
-    while current <= payload.end_date:
-        hh_s, mm_s = map(int, payload.start_time_hm.split(':'))
+    weeks_processed = 0
+    # iterate weekly (every 7 days from start_date)
+    while current <= payload.end_date and weeks_processed < MAX_SEMESTER_WEEKS:
+        if current.weekday() != target_weekday:
+            # safety; should not happen
+            current += timedelta(days=1)
+            continue
+        # Force start time to 08:00 regardless of incoming payload (business rule)
+        hh_s, mm_s = 8, 0
         hh_e, mm_e = map(int, payload.end_time_hm.split(':'))
         start_dt = datetime(current.year, current.month, current.day, hh_s, mm_s, tzinfo=TZ)
         end_dt = datetime(current.year, current.month, current.day, hh_e, mm_e, tzinfo=TZ)
@@ -183,4 +190,5 @@ def create_semester_bookings(db: Session, payload: schemas.SemesterBookingCreate
         except ValueError:
             skipped.append(start_dt.isoformat())
         current += timedelta(days=7)
+        weeks_processed += 1
     return created_ids, skipped

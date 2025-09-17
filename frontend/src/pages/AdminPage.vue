@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { fetchBookings, adminUpdateBooking, adminDeleteBooking, createSemesterBookings, setAdminAuth, verifyAdmin, pingAdmin } from '../api'
+import { fetchRooms } from '../api'
 import StatusChip from '../components/StatusChip.vue'
 import BaseButton from '../components/BaseButton.vue'
 import BaseCard from '../components/BaseCard.vue'
@@ -19,19 +20,68 @@ const authError = ref('')
 const filter = ref('all')
 
 const semForm = ref({
-  room_id: 1,
+  room_id: null, // internal id
   category: 'activity',
   user_name: '',
   user_identity: '',
   purpose: '',
-  weekday: 0,
   start_date: '',
   end_date: '',
-  start_hm: '',
+  start_hm: '08:00', // fixed start at 08:00
   end_hm: ''
+})
+const rooms = ref([])
+const roomMap = computed(()=>{
+  const m = {}
+  for(const r of rooms.value) m[r.id] = r.name
+  return m
+})
+
+// Table filter & sort state
+const filterRoom = ref('all')
+const filterStart = ref('')
+const filterEnd = ref('')
+const sortKey = ref('requested_at') // 'room' | 'requested_at'
+const sortDir = ref('desc') // 'asc' | 'desc'
+
+const filteredSortedBookings = computed(()=>{
+  let arr = bookings.value.slice()
+  // filter by room
+  if(filterRoom.value !== 'all') {
+    arr = arr.filter(b => String(b.room_id) === String(filterRoom.value))
+  }
+  // filter by date range (compare start_time date)
+  if(filterStart.value) {
+    const s = new Date(filterStart.value)
+    arr = arr.filter(b => new Date(b.start_time) >= s)
+  }
+  if(filterEnd.value) {
+    const e = new Date(filterEnd.value)
+    // inclusive end date: use end of day
+    e.setHours(23,59,59,999)
+    arr = arr.filter(b => new Date(b.start_time) <= e)
+  }
+  // sort
+  arr.sort((a,b)=>{
+    let av, bv
+    if(sortKey.value === 'room') {
+      av = roomMap.value[a.room_id] || ''
+      bv = roomMap.value[b.room_id] || ''
+      if(av === bv) return a.id - b.id
+      return av.localeCompare(bv)
+    } else { // requested_at
+      av = new Date(a.requested_at || a.created_at).getTime()
+      bv = new Date(b.requested_at || b.created_at).getTime()
+      if(av === bv) return a.id - b.id
+      return av - bv
+    }
+  })
+  if(sortDir.value === 'desc') arr.reverse()
+  return arr
 })
 const semResult = ref(null)
 const semError = ref('')
+const semPreview = ref([])
 
 const CATEGORY_WINDOWS = {
   activity: { start: 5, end: 22 },
@@ -51,9 +101,38 @@ const halfHourSlots = computed(()=>{
 })
 
 function endSlots() {
-  if(!semForm.value.start_hm) return []
+  // start time fixed 08:00; filter strictly after 08:00
   return halfHourSlots.value.filter(s => s > semForm.value.start_hm)
 }
+
+function sameWeekday(d1, d2) {
+  return new Date(d1).getDay() === new Date(d2).getDay()
+}
+
+function genPreview() {
+  semPreview.value = []
+  const f = semForm.value
+  if(!f.start_date || !f.end_date || !f.start_hm || !f.end_hm) return
+  if(new Date(f.end_date) < new Date(f.start_date)) return
+  const start = new Date(f.start_date)
+  const end = new Date(f.end_date)
+  const weekday = start.getDay()
+  let cur = new Date(start)
+  while(cur <= end) {
+    if(cur.getDay() === weekday) {
+      semPreview.value.push(cur.toISOString().slice(0,10) + ' ' + f.start_hm + '-' + f.end_hm)
+      cur.setDate(cur.getDate() + 7)
+    } else {
+      cur.setDate(cur.getDate() + 1)
+    }
+    if(semPreview.value.length > 120) break // safety cap
+  }
+}
+
+// Watchers (simple manual re-gen)
+;['start_date','end_date','start_hm','end_hm'].forEach(k=>{
+  watch(()=>semForm.value[k], ()=>{ genPreview() })
+})
 
 async function load() {
   loading.value = true
@@ -79,7 +158,7 @@ onMounted(async ()=>{
     // open mode
     markAdmin('open')
     needLogin.value = false
-    await load()
+  await Promise.all([load(), loadRooms()])
     return
   }
   const su = localStorage.getItem('admin_user')
@@ -92,8 +171,13 @@ onMounted(async ()=>{
   } else {
     needLogin.value = true
   }
-  await load()
+  await Promise.all([load(), loadRooms()])
 })
+
+async function loadRooms() {
+  try { rooms.value = await fetchRooms() } catch(e) { console.warn('load rooms failed', e) }
+  if(!semForm.value.room_id && rooms.value.length) semForm.value.room_id = rooms.value[0].id
+}
 
 async function setStatus(b, status) {
   try { await adminUpdateBooking(b.id, status); await load() } catch(e) { alert(e.message) }
@@ -107,8 +191,14 @@ async function submitSemester() {
   semError.value = ''
   semResult.value = null
   const f = semForm.value
-  if(!f.start_date || !f.end_date || !f.start_hm || !f.end_hm) {
+  if(!f.start_date || !f.end_date || !f.end_hm) { // start_hm fixed
     semError.value = '請完整填寫日期與時間'; return
+  }
+  if(new Date(f.end_date) < new Date(f.start_date)) { semError.value='結束日期需晚於或等於開始日期'; return }
+  if(!sameWeekday(f.start_date, f.start_date)) { semError.value='開始日期無效'; return }
+  // enforce end_date same weekday lock
+  if(new Date(f.start_date).getDay() !== new Date(f.end_date).getDay()) {
+    semError.value = '開始與結束日期必須為同一星期幾'; return
   }
   try {
     const payload = {
@@ -117,17 +207,18 @@ async function submitSemester() {
       user_name: f.user_name,
       user_identity: f.user_identity,
       purpose: f.purpose,
-      weekday: Number(f.weekday),
       start_date: f.start_date,
       end_date: f.end_date,
-      start_time_hm: f.start_hm,
+      start_time_hm: '08:00', // enforce start 08:00
       end_time_hm: f.end_hm
     }
     const res = await createSemesterBookings(payload)
     semResult.value = res
     await load()
+  console.log('[semester] created', res)
   } catch(e) {
     semError.value = e.message || '建立失敗'
+  console.error('[semester] error', e)
   }
 }
 
@@ -175,31 +266,26 @@ function logoutAdmin() {
       <h2 style="margin:0;">後台管理</h2>
       <BaseButton v-if="authState.authEnabled" size="sm" @click="logoutAdmin">登出</BaseButton>
     </div>
-    <div style="margin:0.5rem 0; max-width:200px;">
-      <BaseSelect label="狀態篩選" v-model="filter" @change="load">
-        <option value="all">全部</option>
-        <option value="pending">pending</option>
-        <option value="approved">approved</option>
-        <option value="rejected">rejected</option>
-      </BaseSelect>
-    </div>
-    <details style="margin:1rem 0;" open class="sem-wrapper">
+  <details style="margin:1rem 0;" open class="sem-wrapper">
       <summary class="sem-summary">整學期借用建立</summary>
       <form @submit.prevent="submitSemester" class="sem-grid">
-        <BaseInput label="教室ID" type="number" v-model="semForm.room_id" required />
+        <BaseSelect label="教室" v-model="semForm.room_id" required>
+          <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.name }}</option>
+        </BaseSelect>
         <BaseSelect label="類別" v-model="semForm.category">
           <option value="activity">活動</option>
           <option value="meeting">會議</option>
         </BaseSelect>
-        <BaseSelect label="星期" v-model="semForm.weekday">
-          <option v-for="(d,i) in ['一','二','三','四','五','六','日']" :key="i" :value="i">週{{ d }}</option>
-        </BaseSelect>
+        <div>
+          <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">週期日 (自動)</label>
+          <div style="font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface-alt); min-height:36px; display:flex; align-items:center;">
+            <span v-if="semForm.start_date">{{ ['週日','週一','週二','週三','週四','週五','週六'][new Date(semForm.start_date).getDay()] }}</span>
+            <span v-else style="opacity:.6;">選擇開始日期後顯示</span>
+          </div>
+        </div>
         <BaseInput label="開始日期" type="date" v-model="semForm.start_date" required />
-        <BaseInput label="結束日期" type="date" v-model="semForm.end_date" required />
-        <BaseSelect label="開始" v-model="semForm.start_hm" required>
-          <option value="" disabled>--</option>
-          <option v-for="s in halfHourSlots" :key="s" :value="s">{{ s }}</option>
-        </BaseSelect>
+  <BaseInput label="結束日期" type="date" v-model="semForm.end_date" required :min="semForm.start_date" />
+  <BaseInput label="開始" v-model="semForm.start_hm" disabled />
         <BaseSelect label="結束" v-model="semForm.end_hm" required>
           <option value="" disabled>--</option>
           <option v-for="s in endSlots()" :key="s" :value="s">{{ s }}</option>
@@ -216,16 +302,50 @@ function logoutAdmin() {
           <div>建立成功筆數: {{ semResult.created_ids.length }}</div>
           <div v-if="semResult.skipped_conflicts.length">衝突略過: {{ semResult.skipped_conflicts.length }} 筆</div>
         </div>
+        <div v-if="semPreview.length" class="sem-preview" style="grid-column:1/-1; font-size:11px; line-height:1.3; max-height:120px; overflow:auto; background:var(--surface); border:1px solid var(--border); padding:6px 8px; border-radius:8px;">
+          <strong>預覽 ({{ semPreview.length }} 週):</strong>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+            <span v-for="p in semPreview" :key="p" style="padding:2px 6px; background:var(--surface-alt); border:1px solid var(--border); border-radius:999px;">{{ p }}</span>
+          </div>
+        </div>
       </form>
     </details>
+    <div class="section-divider" />
+    <div class="filters-combo">
+      <div class="status-filter">
+        <BaseSelect label="狀態篩選" v-model="filter" @change="load">
+          <option value="all">全部</option>
+          <option value="pending">pending</option>
+          <option value="approved">approved</option>
+          <option value="rejected">rejected</option>
+        </BaseSelect>
+      </div>
+      <div class="table-filters">
+        <BaseSelect label="教室" v-model="filterRoom">
+          <option value="all">全部教室</option>
+          <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.name }}</option>
+        </BaseSelect>
+        <BaseInput label="開始日" type="date" v-model="filterStart" />
+        <BaseInput label="結束日" type="date" v-model="filterEnd" />
+        <BaseSelect label="排序欄位" v-model="sortKey">
+          <option value="requested_at">提交時間</option>
+          <option value="room">教室</option>
+        </BaseSelect>
+        <BaseSelect label="方向" v-model="sortDir">
+          <option value="desc">↓</option>
+          <option value="asc">↑</option>
+        </BaseSelect>
+        <BaseButton size="sm" type="button" @click="filterRoom='all';filterStart='';filterEnd='';sortKey='requested_at';sortDir='desc'">重置</BaseButton>
+      </div>
+    </div>
     <p v-if="loading">載入中...</p>
     <p v-if="error" style="color:red">{{ error }}</p>
-    <BaseTable v-if="!loading && bookings.length" :columns="[
+    <BaseTable v-if="!loading && filteredSortedBookings.length" :columns="[
       {label:'ID'}, {label:'教室'}, {label:'申請人'}, {label:'身份'}, {label:'類別'}, {label:'用途'}, {label:'申請時間'}, {label:'開始'}, {label:'結束'}, {label:'狀態'}, {label:'操作'}
     ]">
-      <tr v-for="b in bookings" :key="b.id">
+      <tr v-for="b in filteredSortedBookings" :key="b.id">
         <td>{{ b.id }}</td>
-        <td>{{ b.room_id }}</td>
+        <td>{{ roomMap[b.room_id] || b.room_id }}</td>
         <td>{{ b.user_name }}</td>
         <td>{{ b.user_identity }}</td>
         <td>{{ b.category }}</td>
@@ -241,7 +361,7 @@ function logoutAdmin() {
         </td>
       </tr>
     </BaseTable>
-    <p v-else-if="!loading">無資料</p>
+  <p v-else-if="!loading">無符合資料</p>
   </div>
   </div>
 </template>
@@ -258,4 +378,9 @@ function logoutAdmin() {
 .login-fields { display:flex; flex-direction:column; gap:.75rem; margin-bottom:1rem; }
 .login-fields input { width:100%; }
 .err { color:red; margin:0; font-size:.85rem; }
+.table-filters { display:flex; flex-wrap:wrap; gap:.75rem; margin:0.5rem 0 1rem; background:var(--surface); padding:.75rem; border:1px solid var(--border); border-radius:var(--radius-m); }
+.table-filters > * { flex:1 1 140px; }
+.filters-combo { display:flex; flex-direction:column; gap:.75rem; margin-top:.5rem; }
+.status-filter { max-width:200px; }
+.section-divider { border-top:1px solid var(--border); margin:1.25rem 0; }
 </style>
