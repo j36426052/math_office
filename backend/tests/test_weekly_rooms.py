@@ -84,8 +84,8 @@ def test_weekly_rooms_filters_to_next_7_days(client, db):
 def test_weekly_rooms_excludes_past_only(client, db):
     room = create_room(db, "過去室")
     now = datetime.now(TZ)
-    # booking ended 1 hour ago -> should be excluded
-    create_booking(db, room.id, now - timedelta(hours=3), now - timedelta(hours=1))
+    # booking ended yesterday -> should be excluded
+    create_booking(db, room.id, now - timedelta(days=1, hours=3), now - timedelta(days=1, hours=1))
     resp = client.get("/rooms/weekly")
     assert resp.status_code == 200
     data = resp.json()

@@ -7,8 +7,17 @@ from sqlalchemy.orm import Session
 from . import models, schemas, crud
 from .database import engine, Base, get_db
 from datetime import datetime
+import logging
 
 app = FastAPI(title="教室借用系統 API", docs_url=None, redoc_url=None)
+
+# Basic logging setup for app-specific logs (printed to stdout)
+_app_logger = logging.getLogger("math_office")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s"))
+    _app_logger.addHandler(_handler)
+_app_logger.setLevel(logging.INFO)
 
 # -------------------- ADMIN BASIC AUTH --------------------
 security = HTTPBasic(auto_error=False)

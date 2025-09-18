@@ -85,11 +85,13 @@ const semPreview = ref([])
 
 const CATEGORY_WINDOWS = {
   activity: { start: 5, end: 22 },
-  meeting: { start: 5, end: 17 }
+  meeting: { start: 5, end: 17 },
+  course: { start: 5, end: 22 }, // same as activity
 }
 
 const halfHourSlots = computed(()=>{
-  const { start, end } = CATEGORY_WINDOWS[semForm.value.category]
+  const win = CATEGORY_WINDOWS[semForm.value.category] || CATEGORY_WINDOWS['activity']
+  const { start, end } = win
   const arr = []
   for(let h=start; h<=end; h++) {
     for (let m of [0,30]) {

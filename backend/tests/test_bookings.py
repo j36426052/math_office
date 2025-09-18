@@ -1,35 +1,47 @@
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.database import Base, engine, SessionLocal
-from backend.app import models
-import datetime
+from app.main import app
+from app.database import Base, engine, SessionLocal
+from app import models
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-client = TestClient(app)
+TZ = ZoneInfo("Asia/Taipei")
 
-# Ensure fresh DB for test run (sqlite file) - for simplicity drop & create
-Base.metadata.drop_all(bind=engine)
-Base.metadata.create_all(bind=engine)
 
-# Seed rooms manually
-with SessionLocal() as db:
-    for name in ["116","221","電腦教室","204","研討一","研討二"]:
-        db.add(models.Room(name=name))
-    db.commit()
+# Fresh DB per test file run
+def _create_basic_rooms(session):
+    for name in ["志希 116","志希 221（E 化教室）","志希樓電腦教室","大智 204","研討一","研討二"]:
+        session.add(models.Room(name=name))
+    session.commit()
+
+
+def _ensure_db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+
+def _client():
+    return TestClient(app)
 
 
 def test_create_booking_and_conflict():
-    # align to next full hour to satisfy half-hour rule
-    base = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-    start = base + datetime.timedelta(hours=1)
-    end = start + datetime.timedelta(hours=2)
+    _ensure_db()
+    with SessionLocal() as db:
+        _create_basic_rooms(db)
+    client = _client()
+    # Choose a deterministic local time within allowed window: tomorrow 09:00-11:00
+    now_local = datetime.now(TZ)
+    tomorrow = now_local + timedelta(days=1)
+    start = tomorrow.replace(hour=9, minute=0, second=0, microsecond=0)
+    end = start + timedelta(hours=2)
     payload = {
         "room_id": 1,
         "user_name": "張三",
         "user_identity": "S1234567",
         "purpose": "討論",
-    "category": "activity",
+        "category": "activity",
         "start_time": start.isoformat(),
-        "end_time": end.isoformat()
+        "end_time": end.isoformat(),
     }
     r = client.post("/bookings", json=payload)
     assert r.status_code == 200, r.text
@@ -40,9 +52,9 @@ def test_create_booking_and_conflict():
     r2 = client.post("/bookings", json=payload2)
     assert r2.status_code == 409
 
-    # Non overlapping booking should pass
-    start2 = end  # directly after first booking, no overlap
-    end2 = start2 + datetime.timedelta(hours=1)
+    # Non overlapping booking should pass (immediately after first booking)
+    start2 = end
+    end2 = start2 + timedelta(hours=1)
     payload3 = payload | {"start_time": start2.isoformat(), "end_time": end2.isoformat(), "user_name": "王五"}
     r3 = client.post("/bookings", json=payload3)
     assert r3.status_code == 200
@@ -54,6 +66,10 @@ def test_create_booking_and_conflict():
 
 
 def test_list_rooms_and_bookings():
+    _ensure_db()
+    with SessionLocal() as db:
+        _create_basic_rooms(db)
+    client = _client()
     r = client.get("/rooms")
     assert r.status_code == 200
     rooms = r.json()
@@ -65,6 +81,10 @@ def test_list_rooms_and_bookings():
 
 
 def test_rooms_weekly():
+    _ensure_db()
+    with SessionLocal() as db:
+        _create_basic_rooms(db)
+    client = _client()
     r = client.get("/rooms/weekly")
     assert r.status_code == 200, r.text
     data = r.json()
@@ -73,11 +93,15 @@ def test_rooms_weekly():
 
 
 def test_semester_booking_creation():
+    _ensure_db()
+    with SessionLocal() as db:
+        _create_basic_rooms(db)
+    client = _client()
     # pick next Monday for deterministic weekday (weekday=0 => Monday)
-    today = datetime.date.today()
+    today = datetime.now(TZ).date()
     days_ahead = (0 - today.weekday()) % 7
-    next_monday = today + datetime.timedelta(days=days_ahead or 7)
-    end_range = next_monday + datetime.timedelta(weeks=3)
+    next_monday = today + timedelta(days=days_ahead or 7)
+    end_range = next_monday + timedelta(weeks=3)
     payload = {
         "room_id": 1,
         "category": "activity",
@@ -88,7 +112,7 @@ def test_semester_booking_creation():
         "start_date": next_monday.isoformat(),
         "end_date": end_range.isoformat(),
         "start_time_hm": "09:00",
-        "end_time_hm": "10:00"
+        "end_time_hm": "10:00",
     }
     r = client.post('/admin/semester_bookings', json=payload)
     assert r.status_code == 200, r.text

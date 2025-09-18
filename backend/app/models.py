@@ -13,6 +13,7 @@ class BookingStatus(str, enum.Enum):
 class BookingCategory(str, enum.Enum):
     activity = "activity"  # 05:00-22:00
     meeting = "meeting"    # 05:00-17:00
+    course = "course"      # 05:00-22:00 (same as activity)
 
 class Room(Base):
     __tablename__ = "rooms"
