@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -33,6 +33,7 @@ class Booking(Base):
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=False, index=True)
     status = Column(Enum(BookingStatus), default=BookingStatus.pending, index=True)
+    is_semester = Column(Boolean, default=False, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Asia/Taipei")), nullable=False)
     requested_at = Column(DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("Asia/Taipei")), nullable=False)  # 申請送出時間 (排序用)
 

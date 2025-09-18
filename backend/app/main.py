@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import models, schemas, crud
 from .database import engine, Base, get_db
+from sqlalchemy import text
 from datetime import datetime
 import logging
 
@@ -81,6 +82,14 @@ Base.metadata.create_all(bind=engine)
 @app.on_event("startup")
 async def seed_rooms():
     with next(get_db()) as db:
+        # Ensure is_semester column exists for Booking (simple runtime migration for SQLite)
+        try:
+            cols = [r[1] for r in db.execute(text("PRAGMA table_info(bookings)")).fetchall()]
+            if 'is_semester' not in cols:
+                db.execute(text("ALTER TABLE bookings ADD COLUMN is_semester BOOLEAN NOT NULL DEFAULT 0"))
+                db.commit()
+        except Exception:
+            pass
         # Initial seed if empty
         if not db.query(models.Room).first():
             initial_rooms = [
@@ -142,8 +151,8 @@ def create_booking(booking_in: schemas.BookingCreate, db: Session = Depends(get_
     return booking
 
 @app.get("/bookings", response_model=list[schemas.Booking])
-def list_all_bookings(room_id: int | None = None, status: schemas.BookingStatus | None = None, db: Session = Depends(get_db)):
-    return crud.list_bookings(db, room_id=room_id, status=status)
+def list_all_bookings(room_id: int | None = None, status: schemas.BookingStatus | None = None, is_semester: bool | None = None, db: Session = Depends(get_db)):
+    return crud.list_bookings(db, room_id=room_id, status=status, is_semester=is_semester)
 
 @app.patch("/admin/bookings/{booking_id}", response_model=schemas.Booking, dependencies=[Depends(require_admin)])
 def update_status(booking_id: int, update: schemas.BookingUpdateStatus, db: Session = Depends(get_db)):

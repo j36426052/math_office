@@ -87,7 +87,7 @@ def _is_half_hour(dt: datetime) -> bool:
 
 # Bookings
 
-def create_booking(db: Session, booking_in: schemas.BookingCreate):
+def create_booking(db: Session, booking_in: schemas.BookingCreate, *, is_semester: bool = False):
     # validation for category time window and 30-min increments
     start = booking_in.start_time
     end = booking_in.end_time
@@ -149,6 +149,7 @@ def create_booking(db: Session, booking_in: schemas.BookingCreate):
         category=persist_cat,
         start_time=start,
         end_time=end,
+        is_semester=is_semester,
         requested_at=datetime.now(TZ),
     )
     db.add(booking)
@@ -164,12 +165,14 @@ def create_booking(db: Session, booking_in: schemas.BookingCreate):
     )
     return booking
 
-def list_bookings(db: Session, room_id: int | None = None, status: models.BookingStatus | None = None):
+def list_bookings(db: Session, room_id: int | None = None, status: models.BookingStatus | None = None, is_semester: bool | None = None):
     stmt = select(models.Booking).order_by(models.Booking.start_time.desc())
     if room_id:
         stmt = stmt.where(models.Booking.room_id == room_id)
     if status:
         stmt = stmt.where(models.Booking.status == status)
+    if is_semester is not None:
+        stmt = stmt.where(models.Booking.is_semester == is_semester)
     return db.scalars(stmt).all()
 
 def update_booking_status(db: Session, booking_id: int, status: models.BookingStatus):
@@ -199,7 +202,7 @@ def create_semester_bookings(db: Session, payload: schemas.SemesterBookingCreate
     current = payload.start_date
     weeks_processed = 0
     logger.info(
-        "semester_create_begin room=%s user=%s identity=%s category=%s start_date=%s end_date=%s start_hm=%s end_hm=%s forced_start=08:00 weekday=%d",
+        "semester_create_begin room=%s user=%s identity=%s category=%s start_date=%s end_date=%s start_hm=%s end_hm=%s weekday=%d",
         payload.room_id,
         payload.user_name,
         payload.user_identity,
@@ -216,8 +219,8 @@ def create_semester_bookings(db: Session, payload: schemas.SemesterBookingCreate
             # safety; should not happen
             current += timedelta(days=1)
             continue
-        # Force start time to 08:00 regardless of incoming payload (business rule)
-        hh_s, mm_s = 8, 0
+        # Use provided start_time_hm
+        hh_s, mm_s = map(int, payload.start_time_hm.split(':'))
         hh_e, mm_e = map(int, payload.end_time_hm.split(':'))
         start_dt = datetime(current.year, current.month, current.day, hh_s, mm_s, tzinfo=TZ)
         end_dt = datetime(current.year, current.month, current.day, hh_e, mm_e, tzinfo=TZ)
@@ -238,7 +241,7 @@ def create_semester_bookings(db: Session, payload: schemas.SemesterBookingCreate
                 start_time=start_dt,
                 end_time=end_dt,
             )
-            b = create_booking(db, booking_in)
+            b = create_booking(db, booking_in, is_semester=True)
             if b:
                 created_ids.append(b.id)
                 logger.info(

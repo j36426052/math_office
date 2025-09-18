@@ -27,7 +27,7 @@ const semForm = ref({
   purpose: '',
   start_date: '',
   end_date: '',
-  start_hm: '08:00', // fixed start at 08:00
+  start_hm: '08:00', // 預設 08:00，可調整
   end_hm: ''
 })
 const rooms = ref([])
@@ -43,12 +43,17 @@ const filterStart = ref('')
 const filterEnd = ref('')
 const sortKey = ref('requested_at') // 'room' | 'requested_at'
 const sortDir = ref('desc') // 'asc' | 'desc'
+const filterType = ref('all') // 'all' | 'semester' | 'single'
 
 const filteredSortedBookings = computed(()=>{
   let arr = bookings.value.slice()
   // filter by room
   if(filterRoom.value !== 'all') {
     arr = arr.filter(b => String(b.room_id) === String(filterRoom.value))
+  }
+  // filter by type (semester vs single)
+  if(filterType.value !== 'all') {
+    arr = arr.filter(b => filterType.value === 'semester' ? b.is_semester : !b.is_semester)
   }
   // filter by date range (compare start_time date)
   if(filterStart.value) {
@@ -103,7 +108,7 @@ const halfHourSlots = computed(()=>{
 })
 
 function endSlots() {
-  // start time fixed 08:00; filter strictly after 08:00
+  // filter strictly after selected start time
   return halfHourSlots.value.filter(s => s > semForm.value.start_hm)
 }
 
@@ -140,8 +145,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const params = {}
+  const params = {}
     if(filter.value !== 'all') params.status = filter.value
+  if(filterType.value !== 'all') params.is_semester = (filterType.value === 'semester')
     bookings.value = await fetchBookings(params)
   } catch (e) {
   error.value = e.message || '讀取失敗'
@@ -208,7 +214,7 @@ async function submitSemester() {
       purpose: f.purpose,
       start_date: f.start_date,
       end_date: f.end_date,
-      start_time_hm: '08:00', // enforce start 08:00
+  start_time_hm: f.start_hm,
       end_time_hm: f.end_hm
     }
     const res = await createSemesterBookings(payload)
@@ -282,8 +288,11 @@ function logoutAdmin() {
           </div>
         </div>
         <BaseInput label="開始日期" type="date" v-model="semForm.start_date" required />
-  <BaseInput label="結束日期" type="date" v-model="semForm.end_date" required :min="semForm.start_date" />
-  <BaseInput label="開始" v-model="semForm.start_hm" disabled />
+        <BaseInput label="結束日期" type="date" v-model="semForm.end_date" required :min="semForm.start_date" />
+        <BaseSelect label="開始" v-model="semForm.start_hm" required>
+          <option value="" disabled>--</option>
+          <option v-for="s in halfHourSlots" :key="'s-'+s" :value="s">{{ s }}</option>
+        </BaseSelect>
         <BaseSelect label="結束" v-model="semForm.end_hm" required>
           <option value="" disabled>--</option>
           <option v-for="s in endSlots()" :key="s" :value="s">{{ s }}</option>
@@ -319,6 +328,11 @@ function logoutAdmin() {
         </BaseSelect>
       </div>
       <div class="table-filters">
+        <BaseSelect label="類型" v-model="filterType" @change="load">
+          <option value="all">全部</option>
+          <option value="semester">整學期</option>
+          <option value="single">單次</option>
+        </BaseSelect>
         <BaseSelect label="教室" v-model="filterRoom">
           <option value="all">全部教室</option>
           <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.name }}</option>
@@ -333,13 +347,13 @@ function logoutAdmin() {
           <option value="desc">↓</option>
           <option value="asc">↑</option>
         </BaseSelect>
-        <BaseButton size="sm" type="button" @click="filterRoom='all';filterStart='';filterEnd='';sortKey='requested_at';sortDir='desc'">重置</BaseButton>
+  <BaseButton size="sm" type="button" @click="filterType='all';filterRoom='all';filterStart='';filterEnd='';sortKey='requested_at';sortDir='desc'">重置</BaseButton>
       </div>
     </div>
     <p v-if="loading">載入中...</p>
     <p v-if="error" style="color:red">{{ error }}</p>
     <BaseTable v-if="!loading && filteredSortedBookings.length" :columns="[
-  {label:'ID'}, {label:'教室'}, {label:'申請人'}, {label:'指導老師'}, {label:'類別'}, {label:'用途'}, {label:'申請時間'}, {label:'開始'}, {label:'結束'}, {label:'狀態'}, {label:'操作'}
+  {label:'ID'}, {label:'教室'}, {label:'申請人'}, {label:'指導老師'}, {label:'類別'}, {label:'類型'}, {label:'用途'}, {label:'申請時間'}, {label:'開始'}, {label:'結束'}, {label:'狀態'}, {label:'操作'}
     ]">
   <tr v-for="b in filteredSortedBookings" :key="b.id">
         <td>{{ b.id }}</td>
@@ -347,6 +361,7 @@ function logoutAdmin() {
         <td>{{ b.user_name }}</td>
   <td>{{ b.user_identity }}</td>
         <td>{{ b.category }}</td>
+        <td>{{ b.is_semester ? '整學期' : '單次' }}</td>
         <td>{{ b.purpose }}</td>
         <td>{{ new Date(b.requested_at || b.created_at).toLocaleString() }}</td>
         <td>{{ new Date(b.start_time).toLocaleString() }}</td>

@@ -42,6 +42,7 @@ class Booking(BookingBase):
     status: BookingStatus
     created_at: datetime
     requested_at: datetime
+    is_semester: bool = False
     class Config:
         from_attributes = True
 
