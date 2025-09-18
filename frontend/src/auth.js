@@ -3,9 +3,14 @@ import { setAdminAuth, verifyAdmin, pingAdmin } from './api'
 
 export const authState = reactive({ isAdmin: false, user: null, authEnabled: true })
 
+function safeLS() {
+  try { return typeof window !== 'undefined' ? window.localStorage : null } catch { return null }
+}
+
 export async function initAdminFromStorage() {
-  const u = localStorage.getItem('admin_user')
-  const p = localStorage.getItem('admin_pass')
+  const ls = safeLS()
+  const u = ls ? ls.getItem('admin_user') : null
+  const p = ls ? ls.getItem('admin_pass') : null
   try {
     const ping = await pingAdmin().catch(()=>null)
     if(ping && ping.ok) {
@@ -26,9 +31,8 @@ export async function initAdminFromStorage() {
       authState.user = u
     } catch {
       // invalid now -> clear
-      setAdminAuth(null, null)
-      localStorage.removeItem('admin_user')
-      localStorage.removeItem('admin_pass')
+  setAdminAuth(null, null)
+  if(ls) { ls.removeItem('admin_user'); ls.removeItem('admin_pass') }
     }
   }
 }

@@ -14,11 +14,12 @@ function applyTheme(dark) {
 function toggleTheme() {
   isDark.value = !isDark.value
   applyTheme(isDark.value)
-  localStorage.setItem('pref-theme', isDark.value ? 'dark' : 'light')
+  try { localStorage.setItem('pref-theme', isDark.value ? 'dark' : 'light') } catch {}
 }
 
 onMounted(()=>{
-  const saved = localStorage.getItem('pref-theme')
+  let saved = null
+  try { saved = localStorage.getItem('pref-theme') } catch {}
   if(saved) isDark.value = saved === 'dark'
   else if(window.matchMedia('(prefers-color-scheme: dark)').matches) isDark.value = true
   applyTheme(isDark.value)

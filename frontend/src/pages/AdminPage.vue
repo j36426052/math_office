@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { fetchBookings, adminUpdateBooking, adminDeleteBooking, createSemesterBookings } from '../api'
+import { fetchBookings, adminUpdateBooking, adminDeleteBooking, createSemesterBookings, setAdminAuth, verifyAdmin, pingAdmin } from '../api'
 import { fetchRooms } from '../api'
 import StatusChip from '../components/StatusChip.vue'
 import BaseButton from '../components/BaseButton.vue'
@@ -8,12 +8,15 @@ import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseSelect from '../components/BaseSelect.vue'
 import BaseTable from '../components/BaseTable.vue'
-// Auth removed
+import { authState, markAdmin, clearAdmin } from '../auth'
 
 const bookings = ref([])
 const loading = ref(true)
 const error = ref('')
-// auth state removed
+const needLogin = ref(false)
+const adminUser = ref('')
+const adminPass = ref('')
+const authError = ref('')
 const filter = ref('all')
 
 const semForm = ref({
@@ -143,7 +146,30 @@ async function load() {
   } finally { loading.value = false }
 }
 
-onMounted(async ()=>{ await Promise.all([load(), loadRooms()]) })
+onMounted(async ()=>{
+  // detect mode first
+  let ping = null
+  try { ping = await pingAdmin() } catch {}
+  if(ping && ping.ok && !ping.auth_enabled) {
+    // open mode
+    markAdmin('open')
+    needLogin.value = false
+    await Promise.all([load(), loadRooms()])
+    return
+  }
+  let su = null, sp = null
+  try { su = localStorage.getItem('admin_user'); sp = localStorage.getItem('admin_pass') } catch {}
+  if(su && sp) {
+    setAdminAuth(su, sp)
+    try { await verifyAdmin(); markAdmin(su); needLogin.value = false } catch {
+  try { localStorage.removeItem('admin_user'); localStorage.removeItem('admin_pass') } catch {}
+  setAdminAuth(null,null); needLogin.value = true
+    }
+  } else {
+    needLogin.value = true
+  }
+  await Promise.all([load(), loadRooms()])
+})
 
 async function loadRooms() {
   try { rooms.value = await fetchRooms() } catch(e) { console.warn('load rooms failed', e) }
@@ -193,15 +219,47 @@ async function submitSemester() {
   }
 }
 
-// login functions removed
+function attemptLogin() {
+  authError.value = ''
+  if(!adminUser.value || !adminPass.value) { authError.value = '請輸入帳號與密碼'; return }
+  setAdminAuth(adminUser.value, adminPass.value)
+  verifyAdmin().then(()=>{
+  try { localStorage.setItem('admin_user', adminUser.value); localStorage.setItem('admin_pass', adminPass.value) } catch {}
+    markAdmin(adminUser.value)
+    needLogin.value = false
+    load()
+  }).catch(()=>{
+    authError.value = '登入失敗'
+    setAdminAuth(null,null)
+  })
+}
+
+function logoutAdmin() {
+  try { localStorage.removeItem('admin_user'); localStorage.removeItem('admin_pass') } catch {}
+  setAdminAuth(null, null)
+  bookings.value = []
+  needLogin.value = true
+  clearAdmin()
+}
 </script>
 
 <template>
   <div>
-  <div>
+  <div v-if="needLogin && authState.authEnabled" class="login-only">
+    <BaseCard class="login-panel">
+      <h2 class="login-title">管理登入</h2>
+      <div class="login-fields">
+        <BaseInput label="帳號" v-model="adminUser" />
+        <BaseInput label="密碼" type="password" v-model="adminPass" />
+        <div class="login-actions"><BaseButton variant="primary" @click="attemptLogin">登入</BaseButton></div>
+      </div>
+      <p v-if="authError" class="err">{{ authError }}</p>
+    </BaseCard>
+  </div>
+  <div v-else>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
       <h2 style="margin:0;">後台管理</h2>
-  
+      <BaseButton size="sm" v-if="authState.authEnabled && authState.isAdmin" @click="logoutAdmin">登出</BaseButton>
     </div>
   <details style="margin:1rem 0;" open class="sem-wrapper">
       <summary class="sem-summary">整學期借用建立</summary>
@@ -312,6 +370,11 @@ async function submitSemester() {
 .sem-grid input, .sem-grid select, .sem-grid textarea { width:100%; box-sizing:border-box; }
 .sem-result { grid-column:1/-1; font-size:12px; background:var(--info-bg); color:var(--text); padding:.5rem; border:1px solid var(--border); border-radius:var(--radius-s); }
 .err { color:red; margin:0; font-size:.85rem; }
+.login-only { display:flex; justify-content:center; align-items:center; min-height:50vh; }
+.login-panel { width:min(420px, 100%); padding:1rem; }
+.login-title { margin:0 0 1rem; text-align:center; }
+.login-fields { display:flex; flex-direction:column; gap:.75rem; margin-bottom:.5rem; }
+.login-actions { display:flex; justify-content:flex-end; }
 .table-filters { display:flex; flex-wrap:wrap; gap:.75rem; margin:0.5rem 0 1rem; background:var(--surface); padding:.75rem; border:1px solid var(--border); border-radius:var(--radius-m); }
 .table-filters > * { flex:1 1 140px; }
 .filters-combo { display:flex; flex-direction:column; gap:.75rem; margin-top:.5rem; }

@@ -11,20 +11,21 @@ from datetime import datetime
 app = FastAPI(title="教室借用系統 API", docs_url=None, redoc_url=None)
 
 # -------------------- ADMIN BASIC AUTH --------------------
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 ADMIN_USER = os.getenv("ADMIN_USER")
 ADMIN_PASS = os.getenv("ADMIN_PASS")
 
-def require_admin(credentials: HTTPBasicCredentials = Depends(security)):
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)):
     # If credentials not configured -> open (for dev)
     if not ADMIN_USER or not ADMIN_PASS:
         return True
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not credentials or not credentials.username or not credentials.password:
+        # Return 403 to avoid browser basic-auth pop-up (no WWW-Authenticate)
+        raise HTTPException(status_code=403, detail="Forbidden")
     user_ok = secrets.compare_digest(credentials.username, ADMIN_USER)
     pass_ok = secrets.compare_digest(credentials.password, ADMIN_PASS)
     if not (user_ok and pass_ok):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=403, detail="Forbidden")
     return True
 
 # -------------------- CORS CONFIG --------------------
